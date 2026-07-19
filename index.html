@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>个人打卡记录</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div class="app">
+    <!-- 顶部标题 -->
+    <header class="header">
+      <h1>📋 个人打卡记录</h1>
+    </header>
+
+    <!-- 分类标签 -->
+    <nav class="category-nav">
+      <button class="category-btn active" data-category="全部">全部</button>
+      <button class="category-btn" data-category="健身" style="--cat-color: #3B82F6">健身</button>
+      <button class="category-btn" data-category="写作" style="--cat-color: #8B5CF6">写作</button>
+      <button class="category-btn" data-category="英语" style="--cat-color: #10B981">英语</button>
+      <button class="category-btn" data-category="阅读" style="--cat-color: #F59E0B">阅读</button>
+      <button class="category-btn" data-category="21天" style="--cat-color: #EC4899">21天</button>
+    </nav>
+
+    <!-- 主内容区 -->
+    <main class="main-content">
+      <!-- 日历区 -->
+      <section class="calendar-section">
+        <div class="calendar-header">
+          <button class="cal-nav-btn" id="prevMonth">◀</button>
+          <span id="currentMonth"></span>
+          <button class="cal-nav-btn" id="nextMonth">▶</button>
+        </div>
+        <div class="calendar-weekdays">
+          <span>日</span><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span>
+        </div>
+        <div class="calendar-days" id="calendarDays"></div>
+      </section>
+
+      <!-- 打卡记录区 -->
+      <section class="records-section">
+        <!-- 打卡表单 -->
+        <div class="checkin-form">
+          <h3>✏️ 打卡</h3>
+          <div class="form-row">
+            <select id="categorySelect">
+              <option value="健身">健身</option>
+              <option value="写作">写作</option>
+              <option value="英语">英语</option>
+              <option value="阅读">阅读</option>
+              <option value="21天">21天</option>
+            </select>
+          </div>
+          <div class="form-row">
+            <textarea id="contentInput" placeholder="写下今天的收获...（2000字以内）" maxlength="2000"></textarea>
+          </div>
+          <div class="form-row image-row">
+            <label class="image-upload">
+              <input type="file" id="imageInput" accept="image/*" multiple />
+              <span>📷 添加图片</span>
+            </label>
+            <div id="imagePreview" class="image-preview"></div>
+          </div>
+          <div class="form-row">
+            <button id="submitBtn">提交打卡</button>
+          </div>
+        </div>
+
+        <!-- 记录列表 -->
+        <div class="records-list">
+          <h3>📋 打卡记录 <span id="selectedDate"></span></h3>
+          <div id="recordsContainer"></div>
+        </div>
+      </section>
+    </main>
+
+    <!-- 统计概览 -->
+    <section class="stats-section">
+      <div class="stat-card">
+        <span class="stat-num" id="totalCount">0</span>
+        <span class="stat-label">总打卡次数</span>
+      </div>
+      <div class="stat-card">
+        <span class="stat-num" id="streakCount">0</span>
+        <span class="stat-label">连续打卡(天)</span>
+      </div>
+      <div class="stat-card">
+        <span class="stat-num" id="todayCount">0</span>
+        <span class="stat-label">今日打卡</span>
+      </div>
+    </section>
+  </div>
+
+  <script src="js/app.js"></script>
+</body>
+</html>

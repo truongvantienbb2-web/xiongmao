@@ -178,21 +178,72 @@ function bindEvents() {
 }
 
 // 处理图片选择
-function handleImageSelect(e) {
+async function handleImageSelect(e) {
   const files = Array.from(e.target.files);
+  const MAX_IMAGES = 3;
+  const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 
-  files.forEach(file => {
-    if (!file.type.startsWith('image/')) return;
+  if (pendingImages.length + files.length > MAX_IMAGES) {
+    alert(`最多只能上传 ${MAX_IMAGES} 张图片`);
+    return;
+  }
 
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      pendingImages.push(event.target.result);
+  for (const file of files) {
+    if (!file.type.startsWith('image/')) continue;
+    if (file.size > MAX_FILE_SIZE) {
+      alert(`图片 ${file.name} 超过 5MB，请压缩后重试`);
+      continue;
+    }
+
+    try {
+      const compressed = await compressImage(file);
+      pendingImages.push(compressed);
       renderImagePreview();
-    };
-    reader.readAsDataURL(file);
-  });
+    } catch (err) {
+      console.error('图片压缩失败:', err);
+      alert('图片处理失败，请换一张试试');
+    }
+  }
 
   e.target.value = '';
+}
+
+// 压缩图片
+function compressImage(file, maxWidth = 1200, quality = 0.7) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let { width, height } = img;
+
+        if (width > maxWidth || height > maxWidth) {
+          if (width > height) {
+            height = Math.round(height * maxWidth / width);
+            width = maxWidth;
+          } else {
+            width = Math.round(width * maxWidth / height);
+            height = maxWidth;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = '#FFFFFF';
+        ctx.fillRect(0, 0, width, height);
+        ctx.drawImage(img, 0, 0, width, height);
+
+        const compressed = canvas.toDataURL('image/jpeg', quality);
+        resolve(compressed);
+      };
+      img.onerror = reject;
+      img.src = event.target.result;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
 }
 
 // 渲染图片预览
@@ -271,7 +322,7 @@ async function submitCheckin() {
 
   const saved = await saveDataToBin(data);
   if (!saved) {
-    alert('保存失败，请重试');
+    alert('保存失败，可能是图片太大或网络问题，请减少图片数量后重试');
     return;
   }
 

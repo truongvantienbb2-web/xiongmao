@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>前额叶营业中</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div class="app">
+    <!-- 顶部标题 -->
+    <header class="header">
+      <h1>🧠 前额叶营业中</h1>
+    </header>
+
+    <!-- 每日金句 -->
+    <div class="daily-quote">
+      <p id="dailyQuote">"你应该全力以赴，同时又不抱任何希望。"</p>
+    </div>
+
+
+    <!-- 主内容区 -->
+    <main class="main-content">
+      <!-- 日历区 -->
+      <section class="calendar-section">
+        <div class="calendar-header">
+          <button class="cal-nav-btn" id="prevMonth">◀</button>
+          <span id="currentMonth"></span>
+          <button class="cal-nav-btn" id="nextMonth">▶</button>
+        </div>
+        <div class="calendar-weekdays">
+          <span>日</span><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span>
+        </div>
+        <div class="calendar-days" id="calendarDays"></div>
+      </section>
+
+      <!-- 打卡记录区 -->
+      <section class="records-section">
+        <!-- 打卡表单 -->
+        <div class="checkin-form">
+          <h3>✏️ 打卡</h3>
+          <div class="form-row">
+            <input type="text" id="nicknameInput" placeholder="微信昵称（必填）" maxlength="20" required />
+          </div>
+          <div class="form-row category-radio-row">
+            <label class="category-radio" data-color="#3B82F6">
+              <input type="radio" name="categoryRadio" value="健身" checked />
+              <span>健身</span>
+            </label>
+            <label class="category-radio" data-color="#8B5CF6">
+              <input type="radio" name="categoryRadio" value="写作" />
+              <span>写作</span>
+            </label>
+            <label class="category-radio" data-color="#10B981">
+              <input type="radio" name="categoryRadio" value="英语" />
+              <span>英语</span>
+            </label>
+            <label class="category-radio" data-color="#F59E0B">
+              <input type="radio" name="categoryRadio" value="阅读" />
+              <span>阅读</span>
+            </label>
+          </div>
+          <div class="form-row">
+            <textarea id="contentInput" placeholder="写下今天的收获...（2000字以内）" maxlength="2000"></textarea>
+          </div>
+          <div class="form-row">
+            <button id="submitBtn">提交打卡</button>
+          </div>
+        </div>
+
+        <!-- 记录列表 -->
+        <div class="records-list">
+          <h3><svg class="icon" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#10B981" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><line x1="9" y1="12" x2="15" y2="12"/><line x1="9" y1="16" x2="13" y2="16"/></svg>打卡记录 <span id="selectedDate"></span></h3>
+          <div id="recordsContainer"></div>
+        </div>
+      </section>
+    </main>
+
+    <!-- 统计概览 -->
+    <section class="stats-section">
+      <div class="stat-card" style="--stat-color: #3B82F6">
+        <span class="stat-num" id="fitnessCount">0</span>
+        <span class="stat-label">健身打卡</span>
+      </div>
+      <div class="stat-card" style="--stat-color: #8B5CF6">
+        <span class="stat-num" id="writingCount">0</span>
+        <span class="stat-label">写作打卡</span>
+      </div>
+      <div class="stat-card" style="--stat-color: #10B981">
+        <span class="stat-num" id="englishCount">0</span>
+        <span class="stat-label">英语打卡</span>
+      </div>
+      <div class="stat-card" style="--stat-color: #F59E0B">
+        <span class="stat-num" id="readingCount">0</span>
+        <span class="stat-label">阅读打卡</span>
+      </div>
+      <div class="stat-card">
+        <span class="stat-num" id="userCount">0</span>
+        <span class="stat-label">使用人数</span>
+      </div>
+      <div class="stat-card">
+        <span class="stat-num" id="todayCount">0</span>
+        <span class="stat-label">今日打卡</span>
+      </div>
+      <div class="stat-card">
+        <span class="stat-num" id="streakCount">0</span>
+        <span class="stat-label">连续打卡</span>
+      </div>
+    </section>
+
+    <!-- 共享记录区 -->
+    <section class="shared-section">
+      <div class="shared-header">
+        <h3>🌐 班级共享打卡</h3>
+        <button class="share-btn" id="shareBtn">分享我的打卡</button>
+      </div>
+      <p class="share-tip">勾选「共享到班级」的打卡会显示在这里，展示微信昵称。</p>
+      <div id="sharedContainer" class="shared-container">
+        <div class="empty-state">暂无共享打卡</div>
+      </div>
+    </section>
+  </div>
+
+  <script src="js/config.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

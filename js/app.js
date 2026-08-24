@@ -7,6 +7,7 @@ const HEADERS = {
 
 // localStorage key
 const USER_ID_KEY = 'checkin_user_id';
+const NICKNAME_KEY = 'checkin_nickname';
 const SHARED_KEY = 'checkin_shared_ids';
 
 // 状态
@@ -16,11 +17,28 @@ let userCount = 0;
 let currentCategory = '全部';
 let selectedDate = new Date();
 let currentMonth = new Date();
-let pendingImages = []; // 待提交的图片（base64）
 let isLoading = false;
 
 // 常量
 const MAX_DAYS_AGO = Infinity; // 打卡日期限制：无期限
+
+// 王潇金句（双语版）
+const QUOTES = [
+  { zh: "你应该全力以赴，同时又不抱任何希望。", en: "You should give your best effort, while not hoping for anything." },
+  { zh: "你定义你，你塑造你，你成为你。", en: "You define yourself, you shape yourself, you become yourself." },
+  { zh: "找到自己与别人的差别，成为极少数人。", en: "Find what sets you apart and become one of the rare few." },
+  { zh: "生存和大灾大难之外的事，都不值得哭。", en: "Nothing beyond survival and great disasters is worth crying about." },
+  { zh: "把一变成二，再把二变成三，无论如何，都好过旁边的嘲讽和抱怨。", en: "Turn one into two, then two into three — anything is better than the mockery and complaints beside you." },
+  { zh: "逆境让人更渴望寻找答案，而答案永远在尝试之中产生。", en: "Adversity makes people more desperate to find answers, and the answers always come from trying." },
+  { zh: "我们趁早吧，趁活着。", en: "Let's do it now, while we're still alive." },
+  { zh: "没有长远的梦想，就没有持久的旅程。", en: "Without a long-term dream, there is no lasting journey." },
+  { zh: "人生是一团随机和虚无，一直会是无意义，除非你赋予它意义。", en: "Life is chaos and nothingness — always meaningless, unless you give it meaning." },
+  { zh: "无论顺境逆境，总会到来，也总会过去。", en: "Whether good times or bad, they always come and they always go." },
+  { zh: "认识自己是需要不断追问不断定义不断操作，是一辈子都无法完成的。", en: "Knowing yourself requires constant questioning, defining, and action — a life-long journey." },
+  { zh: "我会一直计划，也一直实践，一直付出代价，也一直承担风险，直到把时间用完。", en: "I will keep planning, keep practicing, keep paying the price, and keep taking risks — until time runs out." },
+  { zh: "但凡劝你保持现状的人，他自己的人生选择的也是保持现状。", en: "Anyone who tells you to stay where you are has themselves chosen to stay where they are." },
+  { zh: "再完美的人，也不可能赢得所有人，想要胜出，只需要一直赢得大多数就够了。", en: "No one perfect enough to win everyone — to win, you only need to keep winning most people." }
+];
 
 // 初始化
 document.addEventListener('DOMContentLoaded', () => {
@@ -31,8 +49,25 @@ document.addEventListener('DOMContentLoaded', () => {
     updateStats();
     renderSharedRecords();
     bindEvents();
+    initQuote();
+    initNickname();
+    checkSharedLink();
   });
 });
+
+// 初始化金句
+function initQuote() {
+  const quote = QUOTES[Math.floor(Math.random() * QUOTES.length)];
+  document.getElementById('dailyQuote').innerHTML = `<span class="quote-zh">"${quote.zh}"</span><span class="quote-en">${quote.en}</span>`;
+}
+
+// 初始化昵称
+function initNickname() {
+  const savedNickname = localStorage.getItem(NICKNAME_KEY);
+  if (savedNickname) {
+    document.getElementById('nicknameInput').value = savedNickname;
+  }
+}
 
 // 初始化用户ID
 function initUser() {
@@ -170,107 +205,30 @@ function bindEvents() {
   // 提交打卡
   document.getElementById('submitBtn').addEventListener('click', submitCheckin);
 
-  // 图片上传
-  document.getElementById('imageInput').addEventListener('change', handleImageSelect);
-
   // 分享按钮
   document.getElementById('shareBtn').addEventListener('click', sharePage);
 }
 
-// 处理图片选择
-async function handleImageSelect(e) {
-  const files = Array.from(e.target.files);
-  const MAX_IMAGES = 3;
-  const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+// 提交打卡
+async function submitCheckin() {
+  const nickname = document.getElementById('nicknameInput').value.trim();
+  const categoryRadio = document.querySelector('input[name="categoryRadio"]:checked');
+  const category = categoryRadio ? categoryRadio.value : '健身';
+  const content = document.getElementById('contentInput').value.trim();
+  const isShared = true; // 默认自动分享到打卡墙
 
-  if (pendingImages.length + files.length > MAX_IMAGES) {
-    alert(`最多只能上传 ${MAX_IMAGES} 张图片`);
+  // 保存昵称
+  if (nickname) {
+    localStorage.setItem(NICKNAME_KEY, nickname);
+  }
+
+  if (!nickname) {
+    alert('请输入微信昵称');
     return;
   }
 
-  for (const file of files) {
-    if (!file.type.startsWith('image/')) continue;
-    if (file.size > MAX_FILE_SIZE) {
-      alert(`图片 ${file.name} 超过 5MB，请压缩后重试`);
-      continue;
-    }
-
-    try {
-      const compressed = await compressImage(file);
-      pendingImages.push(compressed);
-      renderImagePreview();
-    } catch (err) {
-      console.error('图片压缩失败:', err);
-      alert('图片处理失败，请换一张试试');
-    }
-  }
-
-  e.target.value = '';
-}
-
-// 压缩图片
-function compressImage(file, maxWidth = 1200, quality = 0.7) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const img = new Image();
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        let { width, height } = img;
-
-        if (width > maxWidth || height > maxWidth) {
-          if (width > height) {
-            height = Math.round(height * maxWidth / width);
-            width = maxWidth;
-          } else {
-            width = Math.round(width * maxWidth / height);
-            height = maxWidth;
-          }
-        }
-
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext('2d');
-        ctx.fillStyle = '#FFFFFF';
-        ctx.fillRect(0, 0, width, height);
-        ctx.drawImage(img, 0, 0, width, height);
-
-        const compressed = canvas.toDataURL('image/jpeg', quality);
-        resolve(compressed);
-      };
-      img.onerror = reject;
-      img.src = event.target.result;
-    };
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
-}
-
-// 渲染图片预览
-function renderImagePreview() {
-  const preview = document.getElementById('imagePreview');
-  preview.innerHTML = pendingImages.map((img, index) => `
-    <div class="image-preview-item">
-      <img src="${img}" alt="预览图${index + 1}" />
-      <button class="remove-img" onclick="removeImage(${index})">✕</button>
-    </div>
-  `).join('');
-}
-
-// 删除待提交的图片
-function removeImage(index) {
-  pendingImages.splice(index, 1);
-  renderImagePreview();
-}
-
-// 提交打卡
-async function submitCheckin() {
-  const category = document.getElementById('categorySelect').value;
-  const content = document.getElementById('contentInput').value.trim();
-  const isShared = document.getElementById('shareInput').checked;
-
-  if (!content && pendingImages.length === 0) {
-    alert('请输入文字或上传图片');
+  if (!content) {
+    alert('请输入打卡内容');
     return;
   }
 
@@ -280,7 +238,7 @@ async function submitCheckin() {
   minDate.setDate(minDate.getDate() - MAX_DAYS_AGO);
 
   if (selectedDate < minDate || selectedDate > today) {
-    alert('只能打卡21天内的日期');
+    alert('打卡日期不能是未来日期');
     return;
   }
 
@@ -289,9 +247,9 @@ async function submitCheckin() {
   const record = {
     id: Date.now(),
     userId,
+    nickname: nickname || '匿名',
     category,
     content: content.substring(0, 2000),
-    images: [...pendingImages],
     date: formatDate(selectedDate),
     time: `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`,
     shared: isShared
@@ -309,9 +267,9 @@ async function submitCheckin() {
     sharedRecords.unshift({
       id: record.id,
       userId,
+      nickname: record.nickname,
       category,
       content: record.content,
-      images: record.images,
       date: record.date,
       time: record.time
     });
@@ -322,15 +280,12 @@ async function submitCheckin() {
 
   const saved = await saveDataToBin(data);
   if (!saved) {
-    alert('保存失败，可能是图片太大或网络问题，请减少图片数量后重试');
+    alert('保存失败，请重试');
     return;
   }
 
   // 清空表单
   document.getElementById('contentInput').value = '';
-  document.getElementById('shareInput').checked = false;
-  pendingImages = [];
-  renderImagePreview();
 
   // 切换到该分类并选中今天
   currentCategory = category;
@@ -344,6 +299,9 @@ async function submitCheckin() {
   renderRecords();
   updateStats();
   renderSharedRecords();
+
+  // 打卡成功后生成海报
+  generatePoster(category, nickname, formatDate(now));
 }
 
 // 删除记录
@@ -464,7 +422,7 @@ function renderRecords() {
     <div class="record-item" data-category="${record.category}">
       <span class="record-cat">${record.category}</span>
       <div class="record-content">
-        ${record.images && record.images.length > 0 ? `<div class="record-images">${record.images.map(img => `<img src="${img}" alt="打卡图片" onclick="previewImage('${img}')" />`).join('')}</div>` : ''}
+        <span class="record-nickname">${escapeHtml(record.nickname || '匿名')}</span>
         ${record.content ? `<p>${escapeHtml(record.content)}</p>` : ''}
         <span class="record-time">${record.time}</span>
       </div>
@@ -488,10 +446,10 @@ function renderSharedRecords() {
   container.innerHTML = recent.map(record => `
     <div class="shared-item" data-category="${record.category}">
       <div class="shared-header-row">
-        <span class="record-cat">${record.category}</span>
-        <span class="shared-date">${record.date} ${record.time}</span>
+        <span class="shared-nickname">${escapeHtml(record.nickname || '匿名')}</span>
+        <span class="shared-date">${record.date}</span>
       </div>
-      ${record.images && record.images.length > 0 ? `<div class="record-images">${record.images.map(img => `<img src="${img}" alt="打卡图片" onclick="previewImage('${img}')" />`).join('')}</div>` : ''}
+      <span class="record-cat">${record.category}</span>
       ${record.content ? `<p>${escapeHtml(record.content)}</p>` : ''}
     </div>
   `).join('');
@@ -500,19 +458,28 @@ function renderSharedRecords() {
 // 更新统计
 function updateStats() {
   const userId = getUserId();
-  const totalCount = document.getElementById('totalCount');
   const streakCount = document.getElementById('streakCount');
   const todayCount = document.getElementById('todayCount');
   const userCountEl = document.getElementById('userCount');
 
   const myRecords = records.filter(r => r.userId === userId);
 
-  totalCount.textContent = myRecords.length;
-  userCountEl.textContent = userCount;
+  // 分类打卡天数
+  const fitnessCount = myRecords.filter(r => r.category === '健身').length;
+  const writingCount = myRecords.filter(r => r.category === '写作').length;
+  const englishCount = myRecords.filter(r => r.category === '英语').length;
+  const readingCount = myRecords.filter(r => r.category === '阅读').length;
+
+  document.getElementById('fitnessCount').textContent = fitnessCount > 0 ? `Day ${fitnessCount}` : '0';
+  document.getElementById('writingCount').textContent = writingCount > 0 ? `Day ${writingCount}` : '0';
+  document.getElementById('englishCount').textContent = englishCount > 0 ? `Day ${englishCount}` : '0';
+  document.getElementById('readingCount').textContent = readingCount > 0 ? `Day ${readingCount}` : '0';
+
+  userCountEl.textContent = `${userCount} users`;
 
   const todayStr = formatDate(new Date());
   const todayRecords = myRecords.filter(r => r.date === todayStr);
-  todayCount.textContent = todayRecords.length;
+  todayCount.textContent = `${todayRecords.length} times`;
 
   // 连续打卡天数
   let streak = 0;
@@ -529,23 +496,104 @@ function updateStats() {
     }
   }
 
-  streakCount.textContent = streak;
+  streakCount.textContent = streak > 0 ? `Day ${streak}` : '0';
 }
 
 // 分享页面
 function sharePage() {
-  const url = window.location.href;
+  const userId = getUserId();
+  const url = `${window.location.origin}${window.location.pathname}?share=${userId}`;
+
   if (navigator.share) {
     navigator.share({
-      title: '个人打卡记录',
+      title: '前额叶营业中',
       text: '来一起打卡吧！',
       url
     });
   } else {
     navigator.clipboard.writeText(url).then(() => {
-      alert('链接已复制到剪贴板，可以分享到班级群了！');
+      alert('分享链接已复制到剪贴板！');
     });
   }
+}
+
+// 检查是否是被分享的链接
+function checkSharedLink() {
+  const params = new URLSearchParams(window.location.search);
+  const sharedUserId = params.get('share');
+
+  if (sharedUserId) {
+    // 显示被分享的用户记录
+    const sharedRecords = records.filter(r => r.userId === sharedUserId);
+    if (sharedRecords.length > 0) {
+      showSharedRecordsModal(sharedUserId, sharedRecords);
+    }
+    // 清除 URL 参数
+    window.history.replaceState({}, '', window.location.pathname);
+  }
+}
+
+// 显示分享记录弹窗
+function showSharedRecordsModal(userId, records) {
+  const modal = document.createElement('div');
+  modal.className = 'image-overlay';
+  modal.id = 'sharedModal';
+
+  // 获取该用户信息
+  const nickname = records[0]?.nickname || '匿名';
+
+  // 按日期分组
+  const byDate = {};
+  records.forEach(r => {
+    if (!byDate[r.date]) byDate[r.date] = [];
+    byDate[r.date].push(r);
+  });
+
+  const dateList = Object.keys(byDate).sort().reverse().slice(0, 7);
+
+  modal.innerHTML = `
+    <div style="background:white;border-radius:16px;padding:24px;max-width:400px;width:90%;max-height:80vh;overflow-y:auto;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+        <h3 style="margin:0;color:#1A1A1A;">${escapeHtml(nickname)}的打卡</h3>
+        <button onclick="closeSharedModal()" style="background:none;border:none;font-size:20px;cursor:pointer;padding:4px;">✕</button>
+      </div>
+      <div style="color:#666;font-size:13px;margin-bottom:16px;">共 ${records.length} 条打卡记录</div>
+      <div style="display:flex;flex-direction:column;gap:12px;">
+        ${dateList.map(date => {
+          const dayRecords = byDate[date];
+          return `
+            <div style="background:#FAFAFA;border-radius:12px;padding:12px;">
+              <div style="font-size:12px;color:#999;margin-bottom:8px;">${date}</div>
+              ${dayRecords.map(r => `
+                <div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:8px;">
+                  <span style="padding:2px 8px;background:${getCategoryColor(r.category)};color:white;border-radius:8px;font-size:11px;">${r.category}</span>
+                  <p style="margin:0;font-size:14px;color:#333;flex:1;">${escapeHtml(r.content.substring(0, 50))}${r.content.length > 50 ? '...' : ''}</p>
+                </div>
+              `).join('')}
+            </div>
+          `;
+        }).join('')}
+      </div>
+      <button onclick="closeSharedModal()" style="width:100%;margin-top:16px;padding:12px;background:#1A1A1A;color:white;border:none;border-radius:8px;font-size:14px;cursor:pointer;">关闭</button>
+    </div>
+  `;
+
+  document.body.appendChild(modal);
+}
+
+function closeSharedModal() {
+  const modal = document.getElementById('sharedModal');
+  if (modal) modal.remove();
+}
+
+function getCategoryColor(category) {
+  const colors = {
+    '健身': '#3B82F6',
+    '写作': '#8B5CF6',
+    '英语': '#10B981',
+    '阅读': '#F59E0B'
+  };
+  return colors[category] || '#6B7280';
 }
 
 // 工具函数
@@ -562,13 +610,302 @@ function escapeHtml(text) {
   return div.innerHTML;
 }
 
-// 图片预览
-function previewImage(src) {
-  const overlay = document.createElement('div');
-  overlay.className = 'image-overlay';
-  overlay.innerHTML = `<img src="${src}" alt="预览" /><button onclick="this.parentElement.remove()">✕</button>`;
-  overlay.addEventListener('click', (e) => {
-    if (e.target === overlay) overlay.remove();
+// 生成打卡海报
+async function generatePoster(category, nickname, dateStr) {
+  const posterContainer = document.createElement('div');
+  posterContainer.className = 'image-overlay';
+  posterContainer.id = 'posterOverlay';
+
+  const canvas = document.createElement('canvas');
+  const ctx = canvas.getContext('2d');
+
+  canvas.width = 540;
+  canvas.height = 960;
+
+  // 治愈系背景图片
+  const bgImages = {
+    '健身': [
+      'https://images.unsplash.com/photo-1571019614242-c5c5dee9f50b?w=540&h=960&fit=crop',
+      'https://images.unsplash.com/photo-1517836357463-d25dfeac3438?w=540&h=960&fit=crop',
+      'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=540&h=960&fit=crop',
+      'https://images.unsplash.com/photo-1571902943202-507ec2618e8f?w=540&h=960&fit=crop'
+    ],
+    '写作': [
+      'https://images.unsplash.com/photo-1455390582262-044cdead277a?w=540&h=960&fit=crop',
+      'https://images.unsplash.com/photo-1501504905252-473c47e087f8?w=540&h=960&fit=crop',
+      'https://images.unsplash.com/photo-1456324504439-367cee3b3c32?w=540&h=960&fit=crop',
+      'https://images.unsplash.com/photo-1517842645767-c639042777db?w=540&h=960&fit=crop'
+    ],
+    '英语': [
+      'https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?w=540&h=960&fit=crop',
+      'https://images.unsplash.com/photo-1512820790803-83ca734da794?w=540&h=960&fit=crop',
+      'https://images.unsplash.com/photo-1481627834876-b7833e8f5570?w=540&h=960&fit=crop',
+      'https://images.unsplash.com/photo-1524995997946-a1c2e315a42f?w=540&h=960&fit=crop'
+    ],
+    '阅读': [
+      'https://images.unsplash.com/photo-1516979187457-637abb4f9353?w=540&h=960&fit=crop',
+      'https://images.unsplash.com/photo-1495446815901-a7297e633e8d?w=540&h=960&fit=crop',
+      'https://images.unsplash.com/photo-1497633762265-9d179a990aa6?w=540&h=960&fit=crop',
+      'https://images.unsplash.com/photo-1512820790803-83ca734da794?w=540&h=960&fit=crop'
+    ]
+  };
+
+  const images = bgImages[category] || bgImages['健身'];
+  const bgUrl = images[Math.floor(Math.random() * images.length)];
+
+  try {
+    const bgImg = await loadImage(bgUrl);
+    ctx.drawImage(bgImg, 0, 0, canvas.width, canvas.height);
+
+    // 添加柔和遮罩
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // 绘制金句
+    const quote = QUOTES[Math.floor(Math.random() * QUOTES.length)];
+    ctx.fillStyle = '#FFFFFF';
+    ctx.font = 'bold 32px -apple-system, BlinkMacSystemFont, sans-serif';
+    ctx.textAlign = 'center';
+
+    const maxWidth = 460;
+    const lineHeight = 50;
+    const zhLines = wrapText(ctx, `"${quote.zh}"`, maxWidth);
+
+    const zhStartY = 420;
+    zhLines.forEach((line, i) => {
+      ctx.fillText(line, canvas.width / 2, zhStartY + i * lineHeight);
+    });
+
+    // 分隔线
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+    ctx.lineWidth = 1;
+    const lineY = zhStartY + zhLines.length * lineHeight + 30;
+    ctx.beginPath();
+    ctx.moveTo(140, lineY);
+    ctx.lineTo(400, lineY);
+    ctx.stroke();
+
+    // 英文金句
+    ctx.font = 'italic 20px -apple-system, BlinkMacSystemFont, sans-serif';
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+    const enLines = wrapText(ctx, quote.en, maxWidth);
+    const enStartY = lineY + 30;
+    enLines.forEach((line, i) => {
+      ctx.fillText(line, canvas.width / 2, enStartY + i * 36);
+    });
+
+    // 右上角水印
+    ctx.font = 'bold 20px -apple-system, BlinkMacSystemFont, sans-serif';
+    ctx.fillStyle = '#FFFFFF';
+    ctx.textAlign = 'right';
+    ctx.fillText('前额叶营业中', canvas.width - 40, 50);
+
+    // 左下角昵称
+    ctx.fillStyle = '#FFFFFF';
+    ctx.font = 'bold 20px -apple-system, BlinkMacSystemFont, sans-serif';
+    ctx.textAlign = 'left';
+    const nicknameText = nickname || '匿名';
+    ctx.fillText(nicknameText, 40, canvas.height - 58);
+
+    // 左下角分类标签
+    const catColors = {
+      '健身': '#3B82F6',
+      '写作': '#8B5CF6',
+      '英语': '#10B981',
+      '阅读': '#F59E0B'
+    };
+    const catColor = catColors[category] || '#3B82F6';
+
+    ctx.fillStyle = catColor;
+    const catText = category;
+    ctx.font = 'bold 16px -apple-system, BlinkMacSystemFont, sans-serif';
+    const catWidth = ctx.measureText(catText).width + 24;
+    roundRect(ctx, 40 + ctx.measureText(nicknameText).width + 16, canvas.height - 68, catWidth, 32, 16);
+    ctx.fill();
+
+    ctx.fillStyle = '#FFFFFF';
+    ctx.textAlign = 'center';
+    ctx.fillText(catText, 40 + ctx.measureText(nicknameText).width + 16 + catWidth / 2, canvas.height - 45);
+
+    // 右下角日期
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+    ctx.font = '18px -apple-system, BlinkMacSystemFont, sans-serif';
+    ctx.textAlign = 'right';
+    ctx.fillText(dateStr, canvas.width - 40, canvas.height - 58);
+
+    const dataUrl = canvas.toDataURL('image/png');
+
+    posterContainer.innerHTML = `
+      <div style="text-align:center;">
+        <img src="${dataUrl}" style="max-width:90%;max-height:80%;border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,0.3);" />
+        <div style="margin-top:20px;">
+          <button onclick="downloadPoster()" style="padding:12px 32px;background:#1A1A1A;color:white;border:none;border-radius:8px;font-size:15px;cursor:pointer;margin-right:12px;">下载海报</button>
+          <button onclick="closePoster()" style="padding:12px 32px;background:rgba(255,255,255,0.2);color:white;border:none;border-radius:8px;font-size:15px;cursor:pointer;">关闭</button>
+        </div>
+      </div>
+    `;
+
+    window.currentPosterData = dataUrl;
+    document.body.appendChild(posterContainer);
+
+  } catch (error) {
+    console.error('生成海报失败:', error);
+    generatePosterFallback(category, nickname, dateStr);
+  }
+}
+
+// 备选渐变海报
+function generatePosterFallback(category, nickname, dateStr) {
+  const posterContainer = document.createElement('div');
+  posterContainer.className = 'image-overlay';
+  posterContainer.id = 'posterOverlay';
+
+  const canvas = document.createElement('canvas');
+  const ctx = canvas.getContext('2d');
+  canvas.width = 540;
+  canvas.height = 960;
+
+  const bgColors = {
+    '健身': ['#667eea', '#764ba2'],
+    '写作': ['#f093fb', '#f5576c'],
+    '英语': ['#4facfe', '#00f2fe'],
+    '阅读': ['#43e97b', '#38f9d7']
+  };
+  const [color1, color2] = bgColors[category] || bgColors['健身'];
+
+  const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
+  gradient.addColorStop(0, color1);
+  gradient.addColorStop(1, color2);
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  const quote = QUOTES[Math.floor(Math.random() * QUOTES.length)];
+  ctx.fillStyle = '#FFFFFF';
+  ctx.font = 'bold 32px -apple-system, BlinkMacSystemFont, sans-serif';
+  ctx.textAlign = 'center';
+
+  const maxWidth = 460;
+  const lineHeight = 50;
+  const zhLines = wrapText(ctx, `"${quote.zh}"`, maxWidth);
+  const zhStartY = 420;
+  zhLines.forEach((line, i) => ctx.fillText(line, canvas.width / 2, zhStartY + i * lineHeight));
+
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+  ctx.lineWidth = 1;
+  const lineY = zhStartY + zhLines.length * lineHeight + 30;
+  ctx.beginPath();
+  ctx.moveTo(140, lineY);
+  ctx.lineTo(400, lineY);
+  ctx.stroke();
+
+  ctx.font = 'italic 20px -apple-system, BlinkMacSystemFont, sans-serif';
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+  const enLines = wrapText(ctx, quote.en, maxWidth);
+  const enStartY = lineY + 30;
+  enLines.forEach((line, i) => ctx.fillText(line, canvas.width / 2, enStartY + i * 36));
+
+  ctx.font = 'bold 20px -apple-system, BlinkMacSystemFont, sans-serif';
+  ctx.fillStyle = '#FFFFFF';
+  ctx.textAlign = 'right';
+  ctx.fillText('前额叶营业中', canvas.width - 40, 50);
+
+  ctx.fillStyle = '#FFFFFF';
+  ctx.font = 'bold 20px -apple-system, BlinkMacSystemFont, sans-serif';
+  ctx.textAlign = 'left';
+  const nicknameText = nickname || '匿名';
+  ctx.fillText(nicknameText, 40, canvas.height - 58);
+
+  const catColors = { '健身': '#3B82F6', '写作': '#8B5CF6', '英语': '#10B981', '阅读': '#F59E0B' };
+  const catColor = catColors[category] || '#3B82F6';
+  ctx.fillStyle = catColor;
+  const catText = category;
+  ctx.font = 'bold 16px -apple-system, BlinkMacSystemFont, sans-serif';
+  const catWidth = ctx.measureText(catText).width + 24;
+  roundRect(ctx, 40 + ctx.measureText(nicknameText).width + 16, canvas.height - 68, catWidth, 32, 16);
+  ctx.fill();
+  ctx.fillStyle = '#FFFFFF';
+  ctx.textAlign = 'center';
+  ctx.fillText(catText, 40 + ctx.measureText(nicknameText).width + 16 + catWidth / 2, canvas.height - 45);
+
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+  ctx.font = '18px -apple-system, BlinkMacSystemFont, sans-serif';
+  ctx.textAlign = 'right';
+  ctx.fillText(dateStr, canvas.width - 40, canvas.height - 58);
+
+  const dataUrl = canvas.toDataURL('image/png');
+  posterContainer.innerHTML = `
+    <div style="text-align:center;">
+      <img src="${dataUrl}" style="max-width:90%;max-height:80%;border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,0.3);" />
+      <div style="margin-top:20px;">
+        <button onclick="downloadPoster()" style="padding:12px 32px;background:#1A1A1A;color:white;border:none;border-radius:8px;font-size:15px;cursor:pointer;margin-right:12px;">下载海报</button>
+        <button onclick="closePoster()" style="padding:12px 32px;background:rgba(255,255,255,0.2);color:white;border:none;border-radius:8px;font-size:15px;cursor:pointer;">关闭</button>
+      </div>
+    </div>
+  `;
+  window.currentPosterData = dataUrl;
+  document.body.appendChild(posterContainer);
+}
+
+// 圆角矩形辅助函数
+function roundRect(ctx, x, y, width, height, radius) {
+  ctx.beginPath();
+  ctx.moveTo(x + radius, y);
+  ctx.lineTo(x + width - radius, y);
+  ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
+  ctx.lineTo(x + width, y + height - radius);
+  ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
+  ctx.lineTo(x + radius, y + height);
+  ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
+  ctx.lineTo(x, y + radius);
+  ctx.quadraticCurveTo(x, y, x + radius, y);
+  ctx.closePath();
+}
+
+// 加载图片
+function loadImage(src) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error('图片加载失败'));
+    img.src = src;
   });
-  document.body.appendChild(overlay);
+}
+
+// 文字换行
+function wrapText(ctx, text, maxWidth) {
+  const words = text.split('');
+  const lines = [];
+  let currentLine = '';
+
+  for (let char of words) {
+    const testLine = currentLine + char;
+    const metrics = ctx.measureText(testLine);
+    if (metrics.width > maxWidth && currentLine !== '') {
+      lines.push(currentLine);
+      currentLine = char;
+    } else {
+      currentLine = testLine;
+    }
+  }
+  if (currentLine) {
+    lines.push(currentLine);
+  }
+  return lines;
+}
+
+// 下载海报
+function downloadPoster() {
+  if (window.currentPosterData) {
+    const link = document.createElement('a');
+    link.download = `打卡海报_${new Date().toISOString().slice(0,10)}.png`;
+    link.href = window.currentPosterData;
+    link.click();
+  }
+}
+
+// 关闭海报
+function closePoster() {
+  const overlay = document.getElementById('posterOverlay');
+  if (overlay) overlay.remove();
 }
